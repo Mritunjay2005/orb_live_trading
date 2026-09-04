@@ -1,0 +1,12 @@
+tenancy_ocid     = "ocid1.tenancy.oc1..aaaa..."
+user_ocid        = "ocid1.user.oc1..aaaa..."
+fingerprint      = "xx:xx:xx:..."
+private_key_path = "/path/to/oci_api_key.pem"
+compartment_ocid = "ocid1.tenancy.oc1..aaaa..."   # often same as tenancy for free accounts
+region           = "ap-mumbai-1"
+
+ssh_public_key   = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ... your-key"
+ssh_ingress_cidr = "1.2.3.4/32"   # YOUR current public IP
+
+ampere_ocpus     = 2
+ampere_memory_gb = 12

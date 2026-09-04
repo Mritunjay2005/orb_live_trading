@@ -1,0 +1,86 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Equity",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "orb_equity", "legendFormat": "equity" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "currencyINR" }
+      }
+    },
+    {
+      "title": "Daily Realised PnL",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "orb_daily_pnl", "legendFormat": "pnl" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "currencyINR" }
+      }
+    },
+    {
+      "title": "Open Positions",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "orb_open_positions" }
+      ]
+    },
+    {
+      "title": "Kill Switch Active",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 8 },
+      "targets": [
+        { "expr": "orb_kill_switch_active" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "OK", "color": "green" }, "1": { "text": "TRIGGERED", "color": "red" } } }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Allocation Budget per Symbol",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "orb_allocation_budget", "legendFormat": "{{symbol}}" }
+      ]
+    },
+    {
+      "title": "API Latency",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        { "expr": "rate(orb_api_latency_seconds_sum[5m]) / rate(orb_api_latency_seconds_count[5m])", "legendFormat": "{{endpoint}}" }
+      ]
+    },
+    {
+      "title": "Errors",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        { "expr": "rate(orb_errors_total[5m])", "legendFormat": "{{type}}" }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["orb"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "title": "ORB Live Overview",
+  "uid": "orb-overview",
+  "version": 1
+}
