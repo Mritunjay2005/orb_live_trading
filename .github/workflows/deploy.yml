@@ -1,0 +1,43 @@
+name: Deploy to OCI Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Oracle Cloud
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+          port: 22
+          script_stop: true
+          command_timeout: 30m
+          script: |
+            set -e
+            echo "==> Deploy started at $(date -u)"
+            cd /opt/orb_live_trading
+            echo "==> Fetching latest code from GitHub"
+            git fetch origin main
+            git reset --hard origin/main
+            echo "==> Rebuilding and restarting containers"
+            if command -v docker-compose >/dev/null 2>&1; then
+              docker-compose up -d --build --remove-orphans
+              docker-compose ps
+              docker-compose logs --tail=30 trading || true
+            else
+              docker compose up -d --build --remove-orphans
+              docker compose ps
+              docker compose logs --tail=30 trading || true
+            fi
+            echo "==> Deploy finished at $(date -u)"
