@@ -86,6 +86,7 @@ INTRADAY_CANDLE_URL = "https://api.upstox.com/v3/historical-candle/intraday/{ins
 POSITIONS_URL = "https://api.upstox.com/v2/portfolio/short-term-positions"
 ORDER_BOOK_URL = "https://api.upstox.com/v2/order/retrieve-all"
 LTP_URL = "https://api.upstox.com/v2/market-quote/ltp"
+MARGIN_URL = "https://api.upstox.com/v2/charges/margin"
 
 HEADERS = {
     "Accept": "application/json",
@@ -431,6 +432,47 @@ def load_instruments() -> List[Instrument]:
     return rows
 
 
+
+def get_intraday_margin_per_share(instrument_key: str, price: float) -> float:
+    """
+    Return approximate margin required to buy 1 share intraday (product=I).
+    Falls back to full price (1x) if API fails.
+    """
+    if price <= 0:
+        return 0.0
+    payload = {
+        "instruments": [
+            {
+                "instrument_key": instrument_key,
+                "quantity": 1,
+                "transaction_type": "BUY",
+                "product": "I",
+                "price": float(price),
+            }
+        ]
+    }
+    try:
+        resp = api_post(MARGIN_URL, payload, endpoint="margin")
+        data = resp.get("data") or {}
+        required = (
+            data.get("required_margin")
+            or data.get("total_margin")
+            or data.get("final_margin")
+        )
+        if required is None and isinstance(data.get("margins"), list) and data["margins"]:
+            m0 = data["margins"][0]
+            required = m0.get("required_margin") or m0.get("total_margin") or m0.get("final_margin")
+        if required is None and isinstance(data, dict):
+            required = data.get("total") or (data.get("equity") or {}).get("required_margin")
+        required = float(required or 0)
+        if required <= 0:
+            log.warning("Margin API returned 0 for %s — using full price (1x)", instrument_key)
+            return price
+        return required
+    except Exception as e:
+        log.warning("Margin API failed for %s: %s — using full price (1x)", instrument_key, e)
+        return price
+
 def allocate_and_size(instruments: List[Instrument], total_cash: float) -> List[Instrument]:
     n = len(instruments)
     budget = total_cash / n if n else 0.0
@@ -439,17 +481,21 @@ def allocate_and_size(instruments: List[Instrument], total_cash: float) -> List[
         METRIC_ALLOCATION.labels(symbol=inst.symbol).set(budget)
         inst.ltp = get_ltp(inst.instrument_key)
         if inst.ltp <= 0:
-            log.warning("%s LTP unavailable – max_qty=0", inst.symbol)
+            log.warning("%s LTP unavailable — max_qty=0", inst.symbol)
             inst.max_qty = 0
             continue
-        # How many shares fit in the cash budget?
-        raw_qty = math.floor(budget / inst.ltp)
-        if inst.leverage:
-            raw_qty = raw_qty * LEVERAGE_MULTIPLIER
-        inst.max_qty = max(0, raw_qty)
+
+        # Real Upstox intraday margin for 1 share (true 5x/2x/1x from broker)
+        margin_ps = get_intraday_margin_per_share(inst.instrument_key, inst.ltp)
+        if margin_ps <= 0:
+            inst.max_qty = 0
+            continue
+
+        inst.max_qty = max(0, math.floor(budget / margin_ps))
+        approx_lev = (inst.ltp / margin_ps) if margin_ps else 1.0
         log.info(
-            "%s  budget=₹%.0f  ltp=%.2f  leverage=%s  max_qty=%d",
-            inst.symbol, budget, inst.ltp, inst.leverage, inst.max_qty,
+            "%s  budget=₹%.0f  ltp=%.2f  margin/share=₹%.2f  ~lev=%.1fx  max_qty=%d",
+            inst.symbol, budget, inst.ltp, margin_ps, approx_lev, inst.max_qty,
         )
     return instruments
 
