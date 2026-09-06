@@ -3,7 +3,7 @@ version: "3.8"
 services:
   trading:
     build: .
-    image: ghcr.io/${GITHUB_REPOSITORY:-local}/orb-live-trading:latest
+    image: ghcr.io/local/orb-live-trading:latest
     container_name: orb-trading
     restart: unless-stopped
     env_file:
@@ -48,8 +48,8 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./monitoring/grafana/provisioning.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports:
       - "3000:3000"
     networks:
