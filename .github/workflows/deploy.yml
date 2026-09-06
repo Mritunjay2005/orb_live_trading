@@ -27,17 +27,13 @@ jobs:
             set -e
             echo "==> Deploy started at $(date -u)"
             cd /opt/orb_live_trading
-            echo "==> Fetching latest code from GitHub"
             git fetch origin main
             git reset --hard origin/main
-            echo "==> Rebuilding and restarting containers"
-            if command -v docker-compose >/dev/null 2>&1; then
-              docker-compose up -d --build --remove-orphans
-              docker-compose ps
-              docker-compose logs --tail=30 trading || true
-            else
-              docker compose up -d --build --remove-orphans
-              docker compose ps
-              docker compose logs --tail=30 trading || true
-            fi
+            echo "==> Restarting trading + prometheus"
+            docker rm -f $(docker ps -aq --filter name=grafana) 2>/dev/null || true
+            docker-compose up -d --build --remove-orphans trading prometheus
+            echo "==> Restarting grafana"
+            docker-compose up -d --no-deps grafana || true
+            docker-compose ps
+            docker-compose logs --tail=15 trading || true
             echo "==> Deploy finished at $(date -u)"
