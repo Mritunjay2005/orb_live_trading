@@ -1,0 +1,19 @@
+#cloud-config
+package_update: true
+packages:
+  - docker.io
+  - docker-compose-v2
+  - git
+  - ufw
+
+runcmd:
+  - systemctl enable docker
+  - systemctl start docker
+  - usermod -aG docker ubuntu
+  - ufw allow 22/tcp
+  - ufw allow 80/tcp
+  - ufw allow 443/tcp
+  - ufw --force enable
+  - mkdir -p /opt/trading
+  - git clone ${git_repo_url} /opt/trading || (cd /opt/trading && git pull)
+  - echo "Repo cloned to /opt/trading. Add your .env file, then run: cd /opt/trading && docker compose up -d --build" > /opt/trading/DEPLOY_NOTE.txt

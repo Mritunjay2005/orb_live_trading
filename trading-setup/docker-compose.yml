@@ -1,0 +1,179 @@
+version: "3.9"
+
+networks:
+  trading-net:
+    driver: bridge
+
+volumes:
+  redis-data:
+  prometheus-data:
+  grafana-data:
+  caddy-data:
+
+services:
+  # ---------------- Reverse proxy / TLS ----------------
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy-data:/data
+    networks: [trading-net]
+    depends_on: [dashboard, grafana]
+
+  # ---------------- Redis (backbone for queue-service) ----------------
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    networks: [trading-net]
+
+  # ---------------- Execution Gate ----------------
+  execution-gate:
+    build: ./execution-gate
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - QUEUE_SERVICE_URL=http://queue-service:8000
+    networks: [trading-net]
+    ports:
+      - "127.0.0.1:8001:8000"   # not exposed publicly, only via caddy/dashboard if needed
+
+  # ---------------- Algo Pods (4 independent, atomic) ----------------
+  algo-pod-1:
+    build: ./algo-pod
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - POD_ID=algo-pod-1
+      - STRATEGY_MODULE=strategies.example_strategy
+      - INSTRUMENTS=NSE_FO:NIFTY
+      - EXECUTION_GATE_URL=http://execution-gate:8000
+      - QUEUE_SERVICE_URL=http://queue-service:8000
+    volumes:
+      - ./algo-pod/strategies:/app/strategies:ro
+    networks: [trading-net]
+    depends_on: [execution-gate, queue-service]
+
+  algo-pod-2:
+    build: ./algo-pod
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - POD_ID=algo-pod-2
+      - STRATEGY_MODULE=strategies.example_strategy
+      - INSTRUMENTS=NSE_EQ:RELIANCE
+      - EXECUTION_GATE_URL=http://execution-gate:8000
+      - QUEUE_SERVICE_URL=http://queue-service:8000
+    volumes:
+      - ./algo-pod/strategies:/app/strategies:ro
+    networks: [trading-net]
+    depends_on: [execution-gate, queue-service]
+
+  algo-pod-3:
+    build: ./algo-pod
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - POD_ID=algo-pod-3
+      - STRATEGY_MODULE=strategies.example_strategy
+      - INSTRUMENTS=NSE_EQ:HDFCBANK
+      - EXECUTION_GATE_URL=http://execution-gate:8000
+      - QUEUE_SERVICE_URL=http://queue-service:8000
+    volumes:
+      - ./algo-pod/strategies:/app/strategies:ro
+    networks: [trading-net]
+    depends_on: [execution-gate, queue-service]
+    profiles: ["full"]   # comment out this line to always start it; kept optional to save RAM on the 12GB box
+
+  algo-pod-4:
+    build: ./algo-pod
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - POD_ID=algo-pod-4
+      - STRATEGY_MODULE=strategies.example_strategy
+      - INSTRUMENTS=NSE_FO:BANKNIFTY
+      - EXECUTION_GATE_URL=http://execution-gate:8000
+      - QUEUE_SERVICE_URL=http://queue-service:8000
+    volumes:
+      - ./algo-pod/strategies:/app/strategies:ro
+    networks: [trading-net]
+    depends_on: [execution-gate, queue-service]
+    profiles: ["full"]
+
+  # ---------------- Queue Service (fund/txn ledger + pub-sub) ----------------
+  queue-service:
+    build: ./queue-service
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - NOTIFIER_URL=http://notifier:8000
+    networks: [trading-net]
+    depends_on: [redis]
+    ports:
+      - "127.0.0.1:8002:8000"
+
+  # ---------------- Notifier (ntfy + Telegram) ----------------
+  notifier:
+    build: ./notifier
+    restart: unless-stopped
+    env_file: .env
+    networks: [trading-net]
+
+  # ---------------- Monitoring ----------------
+  node-exporter:
+    image: prom/node-exporter:latest
+    restart: unless-stopped
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    command:
+      - '--path.rootfs=/host'
+    networks: [trading-net]
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    restart: unless-stopped
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks: [trading-net]
+
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    networks: [trading-net]
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s/grafana
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    networks: [trading-net]
+    depends_on: [prometheus]
+
+  # ---------------- Public read-only dashboard (OTP gated) ----------------
+  dashboard:
+    build: ./dashboard
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - QUEUE_SERVICE_URL=http://queue-service:8000
+    networks: [trading-net]

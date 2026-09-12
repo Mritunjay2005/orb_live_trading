@@ -1,0 +1,27 @@
+<!doctype html><html><head><title>Live | Trading Dashboard</title>
+<meta http-equiv="refresh" content="15">
+<style>body{font-family:sans-serif;max-width:800px;margin:40px auto}
+table{width:100%;border-collapse:collapse}td,th{border:1px solid #ddd;padding:8px;font-size:14px}
+.pnl-pos{color:green}.pnl-neg{color:red}</style></head>
+<body>
+<h2>Live Trading Overview</h2>
+<p>Logged in as {{ email }} &middot; <a href="/logout">Logout</a> &middot; <a href="/grafana/" target="_blank">Full system health (Grafana)</a></p>
+
+<h3>Daily PnL: <span class="{{ 'pnl-pos' if risk.daily_pnl >= 0 else 'pnl-neg' }}">{{ risk.daily_pnl }}</span></h3>
+<p>Open positions: {{ risk.open_positions }}</p>
+
+<h3>Recent Trades</h3>
+<table>
+<tr><th>Time</th><th>Kind</th><th>Instrument</th><th>Side</th><th>Qty</th></tr>
+{% for t in txns %}
+<tr>
+  <td>{{ t.ts }}</td>
+  <td>{{ t.kind }}</td>
+  <td>{{ t.payload.order.security_id if t.payload.order else '-' }}</td>
+  <td>{{ t.payload.order.side if t.payload.order else '-' }}</td>
+  <td>{{ t.payload.order.quantity if t.payload.order else '-' }}</td>
+</tr>
+{% endfor %}
+</table>
+<p><small>Auto-refreshes every 15s. This page never exposes API keys, account balances beyond PnL, or the ability to place trades.</small></p>
+</body></html>

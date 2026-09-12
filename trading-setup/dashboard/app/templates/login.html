@@ -1,0 +1,12 @@
+<!doctype html><html><head><title>Trading Dashboard Login</title>
+<style>body{font-family:sans-serif;max-width:400px;margin:80px auto;text-align:center}
+input{padding:10px;width:100%;box-sizing:border-box;margin-bottom:10px}
+button{padding:10px 20px;width:100%}</style></head>
+<body>
+<h2>Live Trading Dashboard</h2>
+<p>Enter your email to receive a one-time login code (valid 10 minutes). This is a read-only view.</p>
+<form method="post" action="/request-otp">
+  <input type="email" name="email" placeholder="you@example.com" required>
+  <button type="submit">Send code</button>
+</form>
+</body></html>

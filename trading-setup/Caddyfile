@@ -1,0 +1,21 @@
+# Replace with your real domain once you point DNS at the OCI public IP.
+# Until then, use the OCI public IP directly with :80 (no TLS) for testing,
+# or use a free subdomain (e.g. via DuckDNS / nip.io) to get automatic HTTPS.
+:80 {
+    handle_path /grafana* {
+        reverse_proxy grafana:3000
+    }
+    handle {
+        reverse_proxy dashboard:8000
+    }
+}
+
+# Example once you have a real domain (uncomment and edit):
+# yourdomain.com {
+#     handle_path /grafana* {
+#         reverse_proxy grafana:3000
+#     }
+#     handle {
+#         reverse_proxy dashboard:8000
+#     }
+# }
